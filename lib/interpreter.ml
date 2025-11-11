@@ -16,6 +16,8 @@ let rec could_be_start_of_next = function
       let f1 = could_be_start_of_next p1 in
       let f2 = could_be_start_of_next p2 in
       fun x -> f1 x || f2 x
+  | PMultiple (first :: _) -> could_be_start_of_next first
+  | PMultiple [] -> fun _ -> false
 
 let rec match_literal actual pattern ctx =
   match (Seq.uncons actual, Seq.uncons pattern) with
@@ -65,8 +67,9 @@ let rec match_singular chars ctx pattern =
       match match_singular chars ctx p with
       | Some v -> Some v
       | None -> Some (chars, ctx))
+  | PMultiple patterns -> try_match chars ctx patterns
 
-let rec try_match chars ctx = function
+and try_match chars ctx = function
   | PVar name :: next :: rest ->
       match_variable chars ctx name "" (could_be_start_of_next next)
         (fun inp new_ctx -> try_match inp new_ctx @@ (next :: rest))

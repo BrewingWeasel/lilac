@@ -3,3 +3,4 @@ type pattern =
   | PLiteral of string
   | PEither of pattern * pattern
   | POptional of pattern
+  | PMultiple of pattern list

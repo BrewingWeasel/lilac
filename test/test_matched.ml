@@ -111,3 +111,25 @@ let%expect_test "optional variable at start (variable missing)" =
        [ POptional (PVar "introduction"); PLiteral "Nice to meet you!" ]
        "Nice to meet you!");
   [%expect {| |}]
+
+let%expect_test "simple multiple" =
+  display_vars
+    (run_match
+       [
+         PMultiple
+           [ PLiteral "hi"; POptional (PLiteral ", there"); PLiteral "!" ];
+       ]
+       "hi!");
+  [%expect {| |}]
+
+let%expect_test "multiple either" =
+  display_vars
+    (run_match
+       [
+         PEither
+           ( PMultiple
+               [ PLiteral "hi"; POptional (PLiteral ", there"); PLiteral "!" ],
+             PMultiple [ PLiteral "Yo "; PVar "name"; PLiteral "!" ] );
+       ]
+       "hi!");
+  [%expect {| |}]
