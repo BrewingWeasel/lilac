@@ -27,3 +27,11 @@ let%expect_test "simple parsing parens 2" =
   run_parsing {| ("asdf" & "other") | ("first: " & variable & "!") |};
   [%expect
     {| either(multiple[literal:"asdf"; literal:"other"], multiple[literal:"first: "; multiple[var:variable; literal:"!"]]) |}]
+
+let%expect_test "simple parsing postfix" =
+  run_parsing {| "asdf"? |};
+  [%expect {| optional(literal:"asdf") |}]
+
+let%expect_test "simple parsing parens then optional" =
+  run_parsing {| ("asdf" & "other")? |};
+  [%expect {| optional(multiple[literal:"asdf"; literal:"other"]) |}]

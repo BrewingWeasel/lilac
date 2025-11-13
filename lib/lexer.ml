@@ -3,6 +3,7 @@ type token =
   | TPipe
   | TLParen
   | TRParen
+  | TQuestionMark
   | TNumber of int
   | TIdent of string
   | TString of string
@@ -12,6 +13,7 @@ let token_to_string = function
   | TPipe -> "|"
   | TLParen -> "("
   | TRParen -> ")"
+  | TQuestionMark -> "?"
   | TNumber n -> Printf.sprintf "Number(%d)" n
   | TIdent id -> Printf.sprintf "Ident(%s)" id
   | TString s -> Printf.sprintf "String(%s)" s
@@ -79,6 +81,7 @@ let rec do_lex chars acc =
   | Some ('|', rest) -> do_lex rest (TPipe :: acc)
   | Some ('(', rest) -> do_lex rest (TLParen :: acc)
   | Some (')', rest) -> do_lex rest (TRParen :: acc)
+  | Some ('?', rest) -> do_lex rest (TQuestionMark :: acc)
   | Some (c, rest) when is_alphanumeric c ->
       let* ident, rest_chars = lex_ident (String.make 1 c) rest in
       do_lex rest_chars (TIdent ident :: acc)
