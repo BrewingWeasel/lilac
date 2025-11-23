@@ -10,6 +10,7 @@ type token =
   | TComma
   | TSemicolon
   | TPlus
+  | TColon
   | TDef
   | TPattern
   | TWhere
@@ -28,6 +29,7 @@ let token_to_string = function
   | TComma -> ","
   | TSemicolon -> ";"
   | TPlus -> "+"
+  | TColon -> ":"
   | TDef -> "def"
   | TEnd -> "end"
   | TPattern -> "pattern"
@@ -123,6 +125,7 @@ let rec do_lex chars acc =
   | Some ((i, ','), rest) -> lex_symbol rest TComma i
   | Some ((i, ';'), rest) -> lex_symbol rest TSemicolon i
   | Some ((i, '+'), rest) -> lex_symbol rest TPlus i
+  | Some ((i, ':'), rest) -> lex_symbol rest TColon i
   | Some ((start_pos, c), rest) when is_alphanumeric c ->
       let* ident, end_pos, rest_chars =
         lex_ident (String.make 1 c) rest start_pos

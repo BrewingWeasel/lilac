@@ -48,6 +48,7 @@ let rec lint_pattern acc pattern =
       lint_pattern acc second
   | POptional inner -> lint_pattern acc inner
   | PMultiple members -> List.fold_left lint_pattern acc members
+  | PWithAttribute (inner, _attribute) -> lint_pattern acc inner
 
 let lint_function_impl acc func_def =
   List.fold_left lint_pattern acc func_def.arguments.value

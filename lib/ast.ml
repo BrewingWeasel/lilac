@@ -6,6 +6,7 @@ type pattern =
   | PEither of pattern located_span * pattern located_span
   | POptional of pattern located_span
   | PMultiple of pattern located_span list
+  | PWithAttribute of pattern located_span * string located_span
 
 let rec pattern_to_string = function
   | PVar v -> "var:" ^ v
@@ -22,6 +23,12 @@ let rec pattern_to_string = function
       ^ String.concat "; "
           (List.map (fun pattern -> pattern_to_string pattern.value) members)
       ^ "]"
+  | PWithAttribute (pattern, attribute) ->
+      "with_attribute("
+      ^ pattern_to_string pattern.value
+      ^ ", "
+      ^ attribute.value
+      ^ ")"
 
 type expression =
   | EVar of string

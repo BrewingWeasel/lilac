@@ -52,9 +52,43 @@ and parse_loop min_bp left remaining_tokens =
   match remaining_tokens with
   | [] -> Ok (left, [])
   | { value = TQuestionMark; end_pos; _ } :: rest ->
-      parse_loop min_bp
-        { left with value = Ast.POptional left; end_pos }
-        rest
+      parse_loop min_bp { left with value = Ast.POptional left; end_pos } rest
+  | { value = TColon; end_pos = attr_start_pos; _ } :: rest ->
+      let* attribute, remaining_tokens =
+        match rest with
+        | { value = TIdent attr_name; end_pos; _ } :: rest ->
+            Ok
+              ( {
+                  value =
+                    Ast.PWithAttribute
+                      ( left,
+                        {
+                          value = attr_name;
+                          start_pos = attr_start_pos;
+                          end_pos;
+                        } );
+                  start_pos = left.start_pos;
+                  end_pos;
+                },
+                rest )
+        | _ ->
+            Error
+              (ExpectedToken
+                 ( [
+                     {
+                       token = TIdent "";
+                       because =
+                         Some
+                           {
+                             value = "An attribute name is expected after ':'";
+                             start_pos = attr_start_pos;
+                             end_pos = attr_start_pos;
+                           };
+                     };
+                   ],
+                   List.nth_opt rest 0 ))
+      in
+      parse_loop min_bp attribute remaining_tokens
   | token :: rest -> (
       match get_binding_power token.value with
       | Some (bp, make_expr) when bp >= min_bp ->

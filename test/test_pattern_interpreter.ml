@@ -185,3 +185,7 @@ let%expect_test "multiple either" =
        ]
        "hi!");
   [%expect {| |}]
+
+let%expect_test "simple lowercase attribute" =
+  display_vars (run_match [ PWithAttribute (with_span @@ PLiteral "upper!", with_span "lower") ] "UPPER!");
+  [%expect {| |}]
