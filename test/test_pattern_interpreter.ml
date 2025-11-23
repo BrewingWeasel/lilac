@@ -28,14 +28,14 @@ let%expect_test "variable then literal (match)" =
     (run_match
        [ PVar "var"; PLiteral " is a variable" ]
        "x is a variable" VariableMap.empty);
-  [%expect {| var: x |}]
+  [%expect {| var: "x" |}]
 
 let%expect_test "literal variable then literal (match)" =
   display_vars
     (run_match
        [ PLiteral "It seems that "; PVar "var"; PLiteral " is a variable" ]
        "It seems that x is a variable" VariableMap.empty);
-  [%expect {| var: x |}]
+  [%expect {| var: "x" |}]
 
 let%expect_test "literal variable then literal (no match)" =
   display_vars
@@ -81,7 +81,7 @@ let%expect_test "either ends with variable" =
          PEither (with_span @@ PLiteral "none", with_span @@ PVar "value");
        ]
        "Value is: 46" VariableMap.empty);
-  [%expect {| value: 46 |}]
+  [%expect {| value: "46" |}]
 
 let%expect_test "either ends with variable but is literal" =
   display_vars
@@ -101,7 +101,7 @@ let%expect_test "either with variable then literal (as variable)" =
          PLiteral " then literal";
        ]
        "46 then literal" VariableMap.empty);
-  [%expect {| value: 46 |}]
+  [%expect {| value: "46" |}]
 
 let%expect_test "either with variable then literal (as literal)" =
   display_vars
@@ -141,7 +141,7 @@ let%expect_test "optional variable at start (variable present)" =
          PLiteral "Nice to meet you!";
        ]
        "hi! Nice to meet you!" VariableMap.empty);
-  [%expect {| introduction: hi!  |}]
+  [%expect {| introduction: "hi! " |}]
 
 let%expect_test "optional variable at start (variable missing)" =
   display_vars

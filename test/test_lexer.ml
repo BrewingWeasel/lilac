@@ -10,7 +10,7 @@ let display_lexed_tokens tokens =
   | Error _ -> Printf.printf "Lexing error\n"
 
 let%expect_test "simple lexing" =
-  display_lexed_tokens @@ lex "hi there & other | 23 thing \n\n\n test32 _yes_";
+  display_lexed_tokens @@ lex "hi there & other | 23 thing \n\n\n test32 _yes_ # comment at the end with pattern !#(*&!$U(* symbols";
   [%expect
     {|
     Ident(hi){0:1}

@@ -77,6 +77,12 @@ let rec lex_whitespace chars =
       lex_whitespace rest
   | _ -> chars
 
+let rec lex_comment chars =
+  match Seq.uncons chars with
+  | Some ((_, '\n'), _) -> chars
+  | Some ((_, _), new_chars) -> lex_comment new_chars
+  | None -> chars
+
 let rec lex_ident acc chars last_pos =
   match Seq.uncons chars with
   | Some ((_, c), _rest) when c = ' ' || c = '\t' || c = '\n' ->
@@ -136,6 +142,7 @@ let rec do_lex chars acc =
           do_lex rest_after_eq
             ({ value = TDoubleEquals; start_pos; end_pos } :: acc)
       | _ -> lex_symbol rest TEquals start_pos)
+  | Some ((_, '#'), rest) -> do_lex (lex_comment rest) acc
   | Some ((start_pos, c), rest) when is_alphanumeric c ->
       let* ident, end_pos, rest_chars =
         lex_ident (String.make 1 c) rest start_pos
