@@ -1,10 +1,13 @@
 open Lilac
 
 let usage_msg = "lilac <file1> -f <function> -i <input>"
+let primary_command = ref ""
 let input_file = ref ""
 let main_function = ref "main"
 let input = ref ""
-let anon_fun filename = input_file := filename
+
+let anon_fun arg =
+  if !primary_command = "" then primary_command := arg else input_file := arg
 
 let speclist =
   [
@@ -32,7 +35,7 @@ let rec main_loop context =
   if line = ":quit" || line = ":q" then ()
   else run_primary line context main_loop
 
-let run_file file_name =
+let run_file file_name run_with =
   let contents = read_file_to_string file_name in
   let file_map = Display_error.to_file_map contents in
   match Lexer.lex contents with
@@ -45,11 +48,16 @@ let run_file file_name =
             (fun warning ->
               prerr_endline (Warnings.display warning file_map file_name))
             warnings;
-          if !input == "" then main_loop context
-          else run_primary !input context (fun _ -> ())
+          run_with context
       | Error err -> prerr_endline (Parser_error.display err file_map file_name)
       )
   | Error err -> prerr_endline (Lexer.display_error err file_map file_name)
 
-let file_name = Sys.argv.(1)
-let () = run_file file_name
+let () =
+  match !primary_command with
+  | "run" when !input == "" -> run_file !input_file main_loop
+  | "run" ->
+      run_file !input_file (fun context ->
+          run_primary !input context (fun _ -> ()))
+  | "test"-> run_file !input_file Test.run_file_tests
+  | cmd -> prerr_endline ("Unknown command: " ^ cmd)
