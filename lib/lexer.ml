@@ -8,8 +8,11 @@ type token =
   | TQuestionMark
   | TEquals
   | TComma
+  | TSemicolon
   | TDef
   | TPattern
+  | TWhere
+  | TEnd
   | TNumber of int
   | TIdent of string
   | TString of string
@@ -22,8 +25,11 @@ let token_to_string = function
   | TQuestionMark -> "?"
   | TEquals -> "="
   | TComma -> ","
+  | TSemicolon -> ";"
   | TDef -> "def"
+  | TEnd -> "end"
   | TPattern -> "pattern"
+  | TWhere -> "where"
   | TNumber n -> Printf.sprintf "Number(%d)" n
   | TIdent id -> Printf.sprintf "Ident(%s)" id
   | TString s -> Printf.sprintf "String(%s)" s
@@ -113,6 +119,7 @@ let rec do_lex chars acc =
   | Some ((i, '?'), rest) -> lex_symbol rest TQuestionMark i
   | Some ((i, '='), rest) -> lex_symbol rest TEquals i
   | Some ((i, ','), rest) -> lex_symbol rest TComma i
+  | Some ((i, ';'), rest) -> lex_symbol rest TSemicolon i
   | Some ((start_pos, c), rest) when is_alphanumeric c ->
       let* ident, end_pos, rest_chars =
         lex_ident (String.make 1 c) rest start_pos
@@ -121,6 +128,8 @@ let rec do_lex chars acc =
         match ident with
         | "def" -> TDef
         | "pattern" -> TPattern
+        | "where" -> TPattern
+        | "end" -> TEnd
         | _ -> TIdent ident
       in
       do_lex rest_chars ({ value = token; start_pos; end_pos } :: acc)

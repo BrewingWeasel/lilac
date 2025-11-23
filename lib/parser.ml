@@ -87,42 +87,87 @@ let rec parse_arguments tokens lparen_loc acc =
              ],
              List.nth_opt rest 0 ))
 
+let parse_pattern_definition tokens =
+  match tokens with
+  | { value = TPattern; start_pos; _ }
+    :: ({ value = TIdent name; _ } as name_loc)
+    :: { value = TEquals; end_pos; _ }
+    :: rest ->
+      let* pattern, remaining_tokens = Pattern_parser.parse_pattern rest in
+      let definition = DPattern ({ name_loc with value = name }, pattern) in
+      Ok ({ value = definition; start_pos; end_pos }, remaining_tokens)
+  | _ ->
+      Error
+        (ExpectedToken
+           ([ { token = TPattern; because = None } ], List.nth_opt tokens 0))
+
+let expect_token tokens expected because =
+  match tokens with
+  | { value = token; _ } :: rest when token = expected -> Ok rest
+  | _ ->
+      Error
+        (ExpectedToken ([ { token = expected; because } ], List.nth_opt tokens 0))
+
+let parse_where_assertions tokens =
+  let rec rec_parse_where acc = function
+    | { value = TEnd; _ } :: rest -> Ok (List.rev acc, rest)
+    | input ->
+        let* first_expr, remaining_tokens = parse_expr input in
+        let* remaining_tokens =
+          expect_token remaining_tokens TEquals
+            (Some
+               {
+                 value = "To match the 'where' assertion syntax";
+                 start_pos = first_expr.start_pos;
+                 end_pos = first_expr.end_pos;
+               })
+        in
+        let* second_expr, remaining_tokens = parse_expr remaining_tokens in
+        let* remaining_tokens =
+          expect_token remaining_tokens TSemicolon
+            (Some
+               {
+                 value = "To end this assertion";
+                 start_pos = first_expr.start_pos;
+                 end_pos = second_expr.end_pos;
+               })
+        in
+        rec_parse_where ((first_expr, second_expr) :: acc) remaining_tokens
+  in
+  match tokens with
+  | { value = TWhere; _ } :: rest -> rec_parse_where [] rest
+  | _ -> Ok ([], tokens)
+
 let parse_definition tokens =
   match tokens with
   | ({ value = TDef; start_pos; _ } as def_loc)
     :: ({ value = TIdent name; _ } as name_loc)
     :: ({ value = TLParen; start_pos = args_start; _ } as lparen_loc)
-    :: rest -> (
+    :: rest ->
       let* arguments, args_end, after_args =
         parse_arguments rest lparen_loc []
       in
-      match after_args with
-      | { value = TEquals; end_pos; _ } :: expr_tokens ->
-          let* body_expr, remaining_tokens = parse_expr expr_tokens in
-          let arguments =
-            { value = arguments; start_pos = args_start; end_pos = args_end }
-          in
-          let definition =
-            DFunction
-              ( { name_loc with value = name },
-                { arguments; expression = body_expr } )
-          in
-          Ok ({ value = definition; start_pos; end_pos }, remaining_tokens)
-      | _ ->
-          Error
-            (ExpectedToken
-               ( [
-                   {
-                     token = TEquals;
-                     because =
-                       Some
-                         {
-                           def_loc with
-                           value = "To match the definition declared here";
-                         };
-                   };
-                 ],
-                 List.nth_opt after_args 0 )))
+      let* body_expr, remaining_tokens = parse_expr after_args in
+      let arguments =
+        { value = arguments; start_pos = args_start; end_pos = args_end }
+      in
+      let* assertions, remaining_tokens =
+        parse_where_assertions remaining_tokens
+      in
+      let* remaining_tokens =
+        if assertions == [] then
+          expect_token remaining_tokens TEnd
+            (Some { def_loc with value = "To end the def block" })
+        else Ok remaining_tokens
+      in
+
+      let definition =
+        DFunction
+          ( { name_loc with value = name },
+            { arguments; expression = body_expr; assertions } )
+      in
+      Ok
+        ({ value = definition; start_pos; end_pos = args_end }, remaining_tokens)
   | { value = TPattern; start_pos; _ }
     :: ({ value = TIdent name; _ } as name_loc)
     :: { value = TEquals; end_pos; _ }

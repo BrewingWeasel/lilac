@@ -63,7 +63,9 @@ let%expect_test "parsing basic function definition" =
     {| 
 def main(
 	(("thing" & variable)? & "other") | "single"
-) = "hello " & name
+) 
+    "hello " & name
+end
   |};
   [%expect
     {| function:[name=main;args=either(multiple[optional(multiple[literal:"thing"; var:variable]); literal:"other"], literal:"single")] = concat(string:"hello ", var:name){2:60} |}]

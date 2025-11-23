@@ -48,6 +48,7 @@ let rec expression_to_string = function
 type function_ = {
   arguments : pattern located_span list located_span;
   expression : expression located_span;
+  assertions : (expression located_span * expression located_span) list;
 }
 
 type definition =
@@ -64,5 +65,21 @@ let definition_to_string = function
              (fun arg -> pattern_to_string arg.value)
              func.arguments.value)
       in
+      let assertions_str =
+        if func.assertions = [] then ""
+        else
+          let assertions_list =
+            List.map
+              (fun (cond, msg) ->
+                "assert("
+                ^ expression_to_string cond.value
+                ^ ", "
+                ^ expression_to_string msg.value
+                ^ ")")
+              func.assertions
+          in
+          "[assertions:" ^ String.concat ";" assertions_list ^ "]"
+      in
       "function:[name=" ^ name.value ^ ";args=" ^ args_str ^ "] = "
       ^ expression_to_string func.expression.value
+      ^ assertions_str
