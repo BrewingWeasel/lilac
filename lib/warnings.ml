@@ -32,6 +32,7 @@ let display warning =
 let rec lint_pattern acc pattern =
   match pattern.value with
   | PVar _ -> acc
+  | PReference _ -> acc
   | PLiteral _ -> acc
   | PEither (first, second) ->
       let acc =

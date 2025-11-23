@@ -2,6 +2,7 @@ open Location
 
 type pattern =
   | PVar of string
+  | PReference of string
   | PLiteral of string
   | PEither of pattern located_span * pattern located_span
   | POptional of pattern located_span
@@ -10,6 +11,7 @@ type pattern =
 
 let rec pattern_to_string = function
   | PVar v -> "var:" ^ v
+  | PReference r -> "ref:" ^ r
   | PLiteral literal -> "literal:\"" ^ literal ^ "\""
   | PEither (first, second) ->
       "either("

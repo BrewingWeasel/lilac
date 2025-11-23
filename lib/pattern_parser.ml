@@ -24,6 +24,26 @@ and parse_left token rest =
       Ok ({ loc with value = Ast.PLiteral s }, rest)
   | { value = TIdent name; _ } as loc ->
       Ok ({ loc with value = Ast.PVar name }, rest)
+  | { value = TDollars; start_pos; _ } -> (
+      match rest with
+      | { value = TIdent name; end_pos; _ } :: after_ident ->
+          Ok ({ value = Ast.PVar name; start_pos; end_pos }, after_ident)
+      | _ ->
+          Error
+            (ExpectedToken
+               ( [
+                   {
+                     token = TIdent "";
+                     because =
+                       Some
+                         {
+                           value = "To match this opening parenthesis";
+                           start_pos;
+                           end_pos = start_pos;
+                         };
+                   };
+                 ],
+                 List.nth_opt rest 0 )))
   | { value = TLParen; start_pos; _ } as lparen_loc -> (
       match parse_binding_power rest 0 with
       | Ok (pattern, next_tokens) -> (

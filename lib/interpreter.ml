@@ -48,18 +48,18 @@ let error_to_string = function
 
 let ( let* ) = Result.bind
 
-let rec get_function_scope values patterns scope =
+let rec get_function_scope context values patterns scope =
   match (values, patterns) with
   | [], [] -> Some scope
   | arg_value :: arg_rest, arg_pattern :: pattern_rest -> (
       match arg_value with
       | Value.VString s -> (
           let new_scope =
-            Pattern_interpreter.run_match [ arg_pattern.value ] s
+            Pattern_interpreter.run_match [ arg_pattern.value ]  s context.patterns
           in
           match new_scope with
           | Some new_scope ->
-              get_function_scope arg_rest pattern_rest
+              get_function_scope context arg_rest pattern_rest
                 (merge_scopes scope new_scope)
           | None -> None)
       | _ -> None)
@@ -73,8 +73,8 @@ let match_defined_functions (context : context) name arguments =
         | [] -> None
         | (func_def : Ast.function_) :: rest -> (
             match
-              get_function_scope arguments func_def.arguments.value
-                Scope.empty_scope
+              get_function_scope context arguments func_def.arguments.value
+                (Scope.new_scope context.patterns)
             with
             | Some func_scope -> Some (func_scope, func_def)
             | None -> find_matching_function rest)

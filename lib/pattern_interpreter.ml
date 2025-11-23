@@ -6,20 +6,24 @@ type context = { char_updater : (char -> char) Option.t }
 
 let default_context = { char_updater = None }
 
-let rec could_be_start_of_next = function
+let rec could_be_start_of_next scope = function
   | PVar _ -> fun _ -> true
+  | PReference name -> (
+      match VariableMap.find_opt name scope.global_patterns with
+      | Some pattern -> could_be_start_of_next scope pattern
+      | None -> fun _ -> false)
   | PLiteral lit -> (
       match lit |> String.to_seq |> Seq.uncons with
       | Some (c, _) -> fun x -> x = c
       | None -> fun _ -> false)
-  | POptional p -> could_be_start_of_next p.value
+  | POptional p -> could_be_start_of_next scope p.value
   | PEither (p1, p2) ->
-      let f1 = could_be_start_of_next p1.value in
-      let f2 = could_be_start_of_next p2.value in
+      let f1 = could_be_start_of_next scope p1.value in
+      let f2 = could_be_start_of_next scope p2.value in
       fun x -> f1 x || f2 x
-  | PMultiple (first :: _) -> could_be_start_of_next first.value
+  | PMultiple (first :: _) -> could_be_start_of_next scope first.value
   | PMultiple [] -> fun _ -> false
-  | PWithAttribute (p, _attribute) -> could_be_start_of_next p.value
+  | PWithAttribute (p, _attribute) -> could_be_start_of_next scope p.value
 
 let next_char seq ctx =
   match Seq.uncons seq with
@@ -40,13 +44,17 @@ let rec match_variable inp ctx scope name acc could_be_end run_end =
   match next_char inp ctx with
   | None ->
       run_end inp
-        { variables = VariableMap.add name (Value.VString acc) scope.variables }
+        {
+          scope with
+          variables = VariableMap.add name (Value.VString acc) scope.variables;
+        }
   | Some (c, rest) ->
       if could_be_end c then
         let new_context =
           if acc = "" then scope
           else
             {
+              scope with
               variables =
                 VariableMap.add name (Value.VString acc) scope.variables;
             }
@@ -69,10 +77,8 @@ let context_from_attribute ctx =
     | None -> new_updater
   in
   function
-  | "upper" ->
-      { char_updater = Some (add_char_updater Char.uppercase_ascii) }
-  | "lower" ->
-      { char_updater = Some (add_char_updater Char.lowercase_ascii) }
+  | "upper" -> { char_updater = Some (add_char_updater Char.uppercase_ascii) }
+  | "lower" -> { char_updater = Some (add_char_updater Char.lowercase_ascii) }
   | _ -> default_context
 
 let rec match_singular chars (ctx : context) scope pattern =
@@ -81,6 +87,10 @@ let rec match_singular chars (ctx : context) scope pattern =
       match_variable chars ctx scope name ""
         (fun _ -> false)
         (fun _ scope -> Some (Seq.empty, scope))
+  | PReference name -> (
+      match VariableMap.find_opt name scope.global_patterns with
+      | Some pattern -> match_singular chars ctx scope pattern
+      | None -> None)
   | PLiteral lit -> match_literal chars (String.to_seq lit) ctx scope
   | PEither (p1, p2) -> (
       match match_singular chars ctx scope p1.value with
@@ -99,7 +109,7 @@ let rec match_singular chars (ctx : context) scope pattern =
 
 and try_match chars (ctx : context) scope = function
   | PVar name :: next :: rest ->
-      match_variable chars ctx scope name "" (could_be_start_of_next next)
+      match_variable chars ctx scope name "" (could_be_start_of_next scope next)
         (fun inp new_scope -> try_match inp ctx new_scope @@ (next :: rest))
   | PEither (first, second) :: rest -> (
       let result = try_match chars ctx scope (first.value :: rest) in
@@ -118,9 +128,11 @@ and try_match chars (ctx : context) scope = function
 and continue rest ctx result =
   Option.bind result (fun (inp, scope) -> try_match inp ctx scope rest)
 
-let run_match patterns text =
+let run_match patterns text global_patterns =
   let result =
-    try_match (String.to_seq text) default_context empty_scope patterns
+    try_match (String.to_seq text) default_context
+      (new_scope global_patterns)
+      patterns
   in
   Option.bind result (fun (inp, scope) ->
       if Seq.is_empty inp then Some scope else None)
