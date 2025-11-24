@@ -11,6 +11,12 @@ let rec run_assertions context assertions passed ran =
   | [] -> (passed, ran)
   | (first, second) :: rest -> (
       let ran = ran + 1 in
+      let handle_error = function
+        | Error err ->
+            Printf.printf "\n\t\x1b[1;31mTest failed\x1b[0m with error: %s"
+              (Interpreter.error_to_string err)
+        | Ok _ -> ()
+      in
       match
         ( Interpreter.eval context first.value,
           Interpreter.eval context second.value )
@@ -18,11 +24,12 @@ let rec run_assertions context assertions passed ran =
       | Ok v1, Ok v2 when v1 = v2 ->
           run_assertions context rest (passed + 1) ran
       | Ok v1, Ok v2 ->
-          Printf.printf "\tTest failed: %s != %s\n" (Value.to_string v1)
+          Printf.printf "\n\t\x1b[1;31mTest failed\x1b[0m: %s != %s" (Value.to_string v1)
             (Value.to_string v2);
           run_assertions context rest passed ran
-      | _, _ ->
-          (* Evaluation error treated as failure *)
+      | e1, e2 ->
+          handle_error e1;
+          handle_error e2;
           run_assertions context rest passed ran)
 
 let test_function context _func_name function_defs (passed, num_functions, total)
@@ -34,8 +41,7 @@ let test_function context _func_name function_defs (passed, num_functions, total
         run_assertions context function_.assertions acc_passed acc_ran)
       (0, 0) function_defs
   in
-  Printf.printf " (%s passed)\n"
-    (colorize newly_passed newly_ran);
+  Printf.printf "\n\t(%s passed)\n" (colorize newly_passed newly_ran);
   (newly_passed + passed, num_functions + 1, newly_ran + total)
 
 let run_file_tests context =
