@@ -2,12 +2,21 @@ open Ast
 open Location
 open Scope
 
+type run_end_func =
+  (int * char) Seq.t -> scope -> ((int * char) Seq.t * Scope.scope) option
+
 type context = {
   char_updater : (char -> char) Option.t;
+  inherited_variable_matcher : ((char -> bool) * run_end_func) Option.t;
   trying_to_match : string;
 }
 
-let default_context = { char_updater = None; trying_to_match = "" }
+let default_context =
+  {
+    char_updater = None;
+    inherited_variable_matcher = None;
+    trying_to_match = "";
+  }
 
 let rec could_be_start_of_next scope = function
   | PVar _ -> fun _ -> true
@@ -44,7 +53,13 @@ let rec match_literal actual pattern ctx scope =
   | Some _, None -> Some (actual, scope)
   | _, _ -> None
 
-let rec match_variable inp ctx scope name acc could_be_end run_end =
+let rec match_variable inp ctx scope name acc could_be_end run_end
+    is_last_in_scope =
+  let ends_here, could_be_end, run_end =
+    match ctx.inherited_variable_matcher with
+    | Some (could_be, run) when is_last_in_scope -> (false, could_be, run)
+    | _ -> (true, could_be_end, run_end)
+  in
   match next_char inp ctx with
   | None ->
       run_end inp
@@ -53,6 +68,11 @@ let rec match_variable inp ctx scope name acc could_be_end run_end =
           variables = VariableMap.add name (Value.VString acc) scope.variables;
         }
   | Some (c, rest) ->
+      let continue () =
+        match_variable rest ctx scope name
+          (acc ^ String.make 1 c)
+          could_be_end run_end is_last_in_scope
+      in
       if could_be_end c then
         let new_context =
           if acc = "" then scope
@@ -64,15 +84,11 @@ let rec match_variable inp ctx scope name acc could_be_end run_end =
             }
         in
         match run_end inp new_context with
-        | None ->
-            match_variable rest ctx scope name
-              (acc ^ String.make 1 c)
-              could_be_end run_end
+        | None -> continue ()
+        | Some (rest, _) when (not @@ Seq.is_empty rest) && ends_here ->
+            continue ()
         | v -> v
-      else
-        match_variable rest ctx scope name
-          (acc ^ String.make 1 c)
-          could_be_end run_end
+      else continue ()
 
 let context_from_attribute ctx =
   let add_char_updater new_updater =
@@ -93,32 +109,8 @@ let rec match_singular chars (ctx : context) scope pattern =
       match_variable chars ctx scope name ""
         (fun _ -> false)
         (fun _ scope -> Some (Seq.empty, scope))
-  | PAs (name, p) -> (
-      let start_at : int =
-        match Seq.uncons chars with
-        | Some ((i, _), _) -> i
-        | None -> String.length ctx.trying_to_match
-      in
-      match match_singular chars ctx scope p.value with
-      | Some (rest, new_scope) ->
-          let end_at : int =
-            match Seq.uncons rest with
-            | Some ((i, _), _) -> i
-            | None -> String.length ctx.trying_to_match
-          in
-          let matched_string =
-            String.sub ctx.trying_to_match start_at (end_at - start_at)
-          in
-          let updated_scope =
-            {
-              new_scope with
-              variables =
-                VariableMap.add name.value (Value.VString matched_string)
-                  scope.variables;
-            }
-          in
-          Some (rest, updated_scope)
-      | None -> None)
+        true
+  | PAs (name, p) -> match_as chars ctx scope p.value name []
   | PReference name -> (
       match VariableMap.find_opt name scope.global_patterns with
       | Some pattern -> match_singular chars ctx scope pattern
@@ -141,8 +133,12 @@ let rec match_singular chars (ctx : context) scope pattern =
 
 and try_match chars (ctx : context) scope = function
   | PVar name :: next :: rest ->
-      match_variable chars ctx scope name "" (could_be_start_of_next scope next)
-        (fun inp new_scope -> try_match inp ctx new_scope @@ (next :: rest))
+      match_variable chars ctx scope name ""
+        (could_be_start_of_next scope next)
+        (fun inp new_scope -> try_match inp ctx new_scope (next :: rest))
+        false
+  | PAs (name, pattern) :: rest ->
+      match_as chars ctx scope pattern.value name rest
   | PReference name :: rest -> (
       match VariableMap.find_opt name scope.global_patterns with
       | Some pattern -> try_match chars ctx scope (pattern :: rest)
@@ -157,17 +153,52 @@ and try_match chars (ctx : context) scope = function
       match result with
       | Some v -> Some v
       | None -> try_match chars ctx scope rest)
-  | PMultiple patterns :: rest -> (
-      let result =
-        try_match chars ctx scope (List.map (fun p -> p.value) patterns @ rest)
-      in
-      match result with Some v -> Some v | None -> None)
+  | PMultiple patterns :: rest ->
+      try_match chars ctx scope (List.map (fun p -> p.value) patterns @ rest)
   | pattern :: rest ->
       continue rest ctx @@ match_singular chars ctx scope pattern
-  | [] -> Some (Seq.empty, scope)
+  | [] -> Some (chars, scope)
 
 and continue rest ctx result =
   Option.bind result (fun (inp, scope) -> try_match inp ctx scope rest)
+
+and match_as chars ctx scope pattern name rest =
+  let start_at : int =
+    match Seq.uncons chars with
+    | Some ((i, _), _) -> i
+    | None -> String.length ctx.trying_to_match
+  in
+  let run_after =
+   fun inp _new_scope ->
+    let end_at : int =
+      match Seq.uncons inp with
+      | Some ((i, _), _) -> i
+      | None -> String.length ctx.trying_to_match
+    in
+    let matched_string =
+      String.sub ctx.trying_to_match start_at (end_at - start_at)
+    in
+    let updated_scope =
+      {
+        scope with
+        variables =
+          VariableMap.add name.value (Value.VString matched_string)
+            scope.variables;
+      }
+    in
+    try_match inp ctx updated_scope rest
+  in
+  let inherited_variable_matcher =
+    match rest with
+    | next :: _ -> Some (could_be_start_of_next scope next, run_after)
+    | [] -> None
+  in
+
+  let ctx = { ctx with inherited_variable_matcher } in
+
+  match match_singular chars ctx scope pattern with
+  | Some (inp, new_scope) when rest = [] -> run_after inp new_scope
+  | v -> v
 
 let run_match patterns text global_patterns =
   let result =

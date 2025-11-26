@@ -30,6 +30,11 @@ let%expect_test "variable then literal (match)" =
        "x is a variable" VariableMap.empty);
   [%expect {| var: "x" |}]
 
+let%expect_test "variable with literal then literal (match)" =
+  display_vars
+    (run_match [ PVar "var"; PLiteral ")" ] "basic)))" VariableMap.empty);
+  [%expect {| var: "basic))" |}]
+
 let%expect_test "literal variable then literal (match)" =
   display_vars
     (run_match
@@ -196,3 +201,45 @@ let%expect_test "simple lowercase attribute" =
        [ PWithAttribute (with_span @@ PLiteral "upper!", with_span "lower") ]
        "UPPER!" VariableMap.empty);
   [%expect {| |}]
+
+let%expect_test "simple as" =
+  display_vars
+    (run_match
+       [ PAs (with_span "var", with_span @@ PLiteral "contents") ]
+       "contents" VariableMap.empty);
+  [%expect {| var: "contents" |}]
+
+let%expect_test "as with variable then text" =
+  display_vars
+    (run_match
+       [
+         PMultiple
+           [
+             with_span @@ PAs (with_span "var", with_span @@ PVar "_other");
+             with_span @@ PLiteral "!!";
+           ];
+       ]
+       "name!!" VariableMap.empty);
+  [%expect {| var: "name" |}]
+
+let%expect_test "as with variable and text then same text later" =
+  display_vars
+    (run_match
+       [
+         PMultiple
+           [
+             with_span
+             @@ PAs
+                  ( with_span "var",
+                    with_span
+                    @@ PMultiple
+                         [
+                           with_span @@ PVar "_other"; with_span @@ PLiteral ")";
+                         ] );
+             with_span @@ PVar "after";
+           ];
+       ]
+       "singular)  after)" VariableMap.empty);
+  [%expect {| _other: "singular"
+var: "singular)"
+after: "  after)" |}]
