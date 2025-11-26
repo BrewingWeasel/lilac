@@ -68,9 +68,7 @@ let rec render_highlight_lines n line current_pos output = function
 
       let length = max 1 highlight.end_pos - highlight.start_pos in
       let gap_until_underline =
-        match on_line_start_pos with
-        | 0 -> ""
-        | _ -> String.make on_line_start_pos ' '
+          if on_line_start_pos <= 0 then "" else String.make on_line_start_pos ' '
       in
       let _, highlight_style = error_level_to_info highlight.error_level in
       output.(0) <-
@@ -83,7 +81,7 @@ let rec render_highlight_lines n line current_pos output = function
             Printf.sprintf "%s%s\x1b[0m" highlight_style highlight.message
           else
             let gap_until_next =
-              match length - 1 with 0 -> "" | l -> String.make l ' '
+              if length <= 1 then "" else String.make (length - 1) ' '
             in
             Printf.sprintf "%s|%s" highlight_style gap_until_next
         in
