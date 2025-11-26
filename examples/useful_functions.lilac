@@ -1,0 +1,50 @@
+pattern whitespace = " " | "\n" | "\t"
+
+def trim_left($whitespace + content)
+	trim_left(content)
+end
+
+def trim_left(content)
+	content
+where
+	trim_left("") == "";
+	trim_left("   content") == "content";
+	trim_left("content") == "content";
+	trim_left(" 
+
+content") == "content";
+end
+
+def trim_right(content + $whitespace)
+	trim_right(content)
+end
+
+def trim_right(content)
+	content
+where
+	trim_right("") == "";
+	trim_right("content ") == "content";
+	trim_right("content") == "content";
+	trim_right("content
+
+			") == "content";
+end
+
+def trim(content)
+	trim_right(trim_left(content))
+where
+	trim("") == "";
+	trim("   content   ") == "content";
+	trim("content") == "content";
+end
+
+def replace_separator(content + ";" + rest, new_separator)
+	content + new_separator + replace_separator(rest, new_separator)
+end
+
+def replace_separator(content, _new_separator)
+	content
+where
+	replace_separator("a;b;c", ",") == "a,b,c";
+	replace_separator("one;two;three;four", "|") == "one|two|three|four";
+end
